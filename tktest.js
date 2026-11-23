@@ -280,7 +280,7 @@
     const cnOpts = '<option value="">Kho Thanh Hóa + Kho Thọ Xuân</option>' + KHO_ORDER.map((k) => '<option value="' + esc(k) + '"' + (k === state.cn ? ' selected' : '') + '>Kho ' + esc(k) + '</option>').join('');
     root.innerHTML = '<style>' + CSS + '</style><div class="ov"></div>' +
       '<div class="dr"><div class="hd"><b>📋 Thống kê Đơn Hàng</b><button class="x" title="Đóng">✕</button></div><div class="bd">' +
-      '<div class="tabs"><div class="tab" data-v="cn">ĐH theo chi nhánh</div><div class="tab" data-v="tho">ĐH theo thợ</div><div class="tab" data-v="xt">ĐH Xe tải</div><div class="tab" data-v="st">ĐH theo ST</div><div class="tab" data-v="sp">Sản Phẩm</div><div class="tab" data-v="cno">Công Nợ</div><div class="tab" data-v="tre">Cảnh Báo Trễ</div></div>' +
+      '<div class="tabs"><div class="tab" data-v="tre">Cảnh Báo Trễ</div><div class="tab" data-v="cno">Công Nợ</div><div class="tab" data-v="cn">ĐH theo chi nhánh</div><div class="tab" data-v="tho">ĐH theo thợ</div><div class="tab" data-v="xt">ĐH Xe tải</div><div class="tab" data-v="st">ĐH theo ST</div><div class="tab" data-v="sp">Sản Phẩm</div></div>' +
       '<div class="row"><div><label>Từ ngày</label><input type="date" id="f" value="' + state.from + '"></div>' +
       '<div><label>Đến ngày</label><input type="date" id="t" value="' + state.to + '"></div>' +
       '<div><label>Chi nhánh</label><select id="cn">' + cnOpts + '</select></div>' +
