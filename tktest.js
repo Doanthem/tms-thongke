@@ -231,6 +231,7 @@
     '@media (max-width:820px){.cards{grid-template-columns:repeat(2,1fr)}}'].join('\n');
   let host, root;
   const state = { view: 'cn', from: '', to: '', preset: 'today', cn: '', warn: '', q: '', open: new Set(), open48: new Set(), open24: new Set(), openDay: new Set(), data: null };
+  window.__tkdhState = state;
   function topSlot() {
     const nav = document.querySelector('header.topnav > nav.topnav-menu');
     if (!nav) return null;
