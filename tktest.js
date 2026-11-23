@@ -872,12 +872,12 @@
     try {
       setMsg('Đang tải công nợ…');
       const dbt = await loadDebt((d, n) => setMsg('Đang tải chi tiết công nợ… ' + d + '/' + n + ' thợ'));
-      const td0 = ymd(new Date());
-      const oldDone = (d) => d.thuLuc && String(d.thuLuc).slice(0, 10) < td0;
-      const users = dbt.users.filter((u) => u.lock).concat(dbt.users.filter((u) => !u.lock).map((u) => { const l = u.list.filter(oldDone); return Object.assign({}, u, { list: l, tien: l.reduce((a, d) => a + d.tien, 0), nDH: l.length, nQH: l.filter((d) => d.qh).length, maxH: l.reduce((m, d) => Math.max(m, d.h), -1) }); }).filter((u) => u.list.length));
       const td = ymd(new Date()), days = range(shift(td, -7), shift(td, 1));
-      let unSos = null;
-      try { const byDay = await fetchDays(days, (d, n) => setMsg('Đang tải ĐH chưa gán user (7 ngày)… ' + d + '/' + n + ' ngày')); unSos = toSO(Object.values(byDay).flat()); } catch (e) {}
+      let unSos = null, rws = [];
+      try { const byDay = await fetchDays(days, (d, n) => setMsg('Đang tải ĐH 7 ngày gần nhất… ' + d + '/' + n + ' ngày')); rws = Object.values(byDay).flat(); unSos = toSO(rws); } catch (e) {}
+      const byId = new Map(); (state.data ? state.data.rows : []).concat(rws).forEach((r) => byId.set(String(r.id), r));
+      const oldDone = (d) => { if (d.thuLuc && String(d.thuLuc).slice(0, 10) < td) return true; const r = byId.get(d.id); return !!(r && r.done && r.ntd && String(r.ntd).slice(0, 10) < td); };
+      const users = dbt.users.filter((u) => u.lock).concat(dbt.users.filter((u) => !u.lock).map((u) => { const l = u.list.filter(oldDone); return Object.assign({}, u, { list: l, tien: l.reduce((a, d) => a + d.tien, 0), nDH: l.length, nQH: l.filter((d) => d.qh).length, maxH: l.reduce((m, d) => Math.max(m, d.h), -1) }); }).filter((u) => u.list.length));
       state.cno = { users, at: dbt.at, unSos, unF: days[0], unT: td };
       render();
       setMsg('✔ Đã tải công nợ ' + users.filter((u) => u.lock).length + ' thợ đang bị khóa, ' + users.filter((u) => !u.lock).length + ' thợ chưa khóa còn nợ ĐH hôm trước · ' + ((Date.now() - t0) / 1000).toFixed(1) + ' giây · cập nhật lúc ' + new Date().toLocaleTimeString('vi-VN') + '.');
