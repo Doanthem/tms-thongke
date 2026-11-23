@@ -861,6 +861,7 @@
     return { C, list, S };
   }
   const dtv = (s) => (s ? vn(String(s).slice(0, 10)) + ' ' + hm(String(s)) : '—');
+  const dts = (s) => (s ? String(s).slice(8, 10) + '/' + String(s).slice(5, 7) + ' ' + hm(String(s)) : '—');
   function renderCNO(out) {
     const B = buildCNO();
     if (!B) { root.querySelector('#cards').innerHTML = ''; root.querySelector('#note').textContent = ''; out.innerHTML = '<div class="empty">Bấm <b>Thống kê</b> để tải công nợ.</div>'; return; }
@@ -884,8 +885,8 @@
         '<td>' + (x.maxH >= 0 ? '<span class="w ' + CLS(x.maxH) + '">' + x.maxH + 'h</span>' : '<span class="zz">-</span>') + '</td><td><span class="w w-r">Đã khóa</span></td></tr>';
       if (!op) return;
       const l = x.list.slice().sort((a, b) => b.h - a.h);
-      h += '<tr class="det"><td colspan="' + cols + '"><div class="stk"><b>Chi tiết ĐH đã khóa – ' + esc(x.user + ' - ' + x.name) + '</b>' + (x.err ? ' <span style="color:#dc2626">(lỗi tải chi tiết)</span>' : '') + '<table><thead><tr><th>Mã vận đơn</th><th>Loại xe</th><th>Tạo đơn</th><th>Hẹn giao</th><th>Xuất hàng</th><th>Thu tiền lúc</th><th>Số giờ nợ</th><th>Tổng tiền</th><th>Quá hạn</th></tr></thead><tbody>' +
-        (l.length ? l.map((d) => '<tr><td>' + esc(d.id) + '</td><td>' + esc(d.xe) + '</td><td>' + dtv(d.tao) + '</td><td>' + dtv(d.hen) + '</td><td>' + dtv(d.xg) + '</td><td>' + dtv(d.thuLuc) + '</td><td>' + (d.h >= 0 ? '<b style="color:' + COL(d.h) + '">' + d.h + 'h</b>' : '—') + '</td><td class="tien">' + fmt(Math.round(d.tien)) + '</td><td>' + (d.qh ? '<b style="color:#dc2626">Quá hạn</b>' : '') + '</td></tr>').join('') : '<tr><td colspan="9" class="empty">Không có chi tiết.</td></tr>') +
+      h += '<tr class="det"><td colspan="' + cols + '"><div class="stk"><b>Chi tiết ĐH đã khóa – ' + esc(x.user + ' - ' + x.name) + '</b>' + (x.err ? ' <span style="color:#dc2626">(lỗi tải chi tiết)</span>' : '') + '<table style="width:100%;font-size:11.5px"><thead><tr><th>Mã vận đơn</th><th>Loại xe</th><th>Hẹn giao</th><th>Xuất hàng</th><th>Thu tiền lúc</th><th>Số giờ nợ</th><th>Tổng tiền</th><th>Quá hạn</th></tr></thead><tbody>' +
+        (l.length ? l.map((d) => '<tr><td>' + esc(d.id) + '</td><td>' + esc(d.xe) + '</td><td>' + dts(d.hen) + '</td><td>' + dts(d.xg) + '</td><td>' + dts(d.thuLuc) + '</td><td>' + (d.h >= 0 ? '<b style="color:' + COL(d.h) + '">' + d.h + 'h</b>' : '—') + '</td><td class="tien">' + fmt(Math.round(d.tien)) + '</td><td>' + (d.qh ? '<b style="color:#dc2626">Quá hạn</b>' : '') + '</td></tr>').join('') : '<tr><td colspan="8" class="empty">Không có chi tiết.</td></tr>') +
         '</tbody></table></div></td></tr>';
     });
     h += '<tr class="tot"><td colspan="2">Tổng cộng (' + fmt(list.length) + ' thợ)</td><td>' + Z(S.nQH) + '</td><td class="tien">' + VND(S.tien) + '</td><td>' + (S.maxH >= 0 ? '<span class="w ' + CLS(S.maxH) + '">' + S.maxH + 'h</span>' : '') + '</td><td></td></tr>';
