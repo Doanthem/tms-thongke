@@ -838,7 +838,7 @@
       setMsg('Đang tải công nợ…');
       await ensureApiReq();
       const base = apiReq.url.replace(/ShipmentOrder\/SearchShipmentOrder/i, '');
-      const post = async (path, body) => { const r = await _fetch.call(window, base + path, Object.assign({}, apiReq.init, { body: JSON.stringify(body) })); const j = await r.json(); if (!j || j.IsError) throw new Error((j && j.Message) || 'Lỗi tải công nợ'); return j.ResultObject || []; };
+      const post = async (path, body, tries = 2) => { let r; try { const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 15000); r = await _fetch.call(window, base + path, Object.assign({}, apiReq.init, { body: JSON.stringify(body), signal: ac.signal })); clearTimeout(tm); } catch (e) { if (tries > 1) return post(path, body, tries - 1); throw new Error('Hết thời gian chờ TMS trả công nợ'); } const j = await r.json(); if (!j || j.IsError) throw new Error((j && j.Message) || 'Lỗi tải công nợ'); return j.ResultObject || []; };
       const users = [];
       for (const [id, kho] of CNO_KHO) {
         const l = await post('StaffDebt/SearchNew', [{ SearchKey: '@USERNAME', SearchValue: -1 }, { SearchKey: '@STOREID', SearchValue: id }, { SearchKey: '@ISLOCKDELIVERY', SearchValue: 1 }, { SearchKey: '@PAGESIZE', SearchValue: 1000 }, { SearchKey: '@PAGEINDEX', SearchValue: 0 }]);
