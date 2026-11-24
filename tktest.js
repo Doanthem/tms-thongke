@@ -35,7 +35,9 @@
   }
   const VUNG = 'Thanh Hóa + Thọ Xuân';
   const KHO_LIST = [
-    [33386, 'VHN_THO - Kho Thợ DMX Thanh Hóa (MST mới)'], [33139, 'VHN_THO - Kho Thợ DMX Thọ Xuân (MST mới)']];
+    [33386, 'VHN_THO - Kho Thợ DMX Thanh Hóa (MST mới)'], [33139, 'VHN_THO - Kho Thợ DMX Thọ Xuân (MST mới)'],
+    // mã kho cũ (dùng đến khoảng tháng 7/2026) – để xem được số liệu các tháng trước
+    [15174, 'VHN_THO - Kho Thợ DMX Thanh Hóa (OFF)'], [7374, 'VHN_THO - Kho Thợ DMX Thọ Xuân (OFF)']];
   const norm = (s) => (s || '').normalize('NFC').trim();
   const KHO = {};
   KHO_LIST.forEach(([id, full]) => {
