@@ -1019,11 +1019,14 @@
       const b = [...el.querySelectorAll('span,b')].find((x) => !clear(getComputedStyle(x).backgroundColor));
       if (b) { const bs = getComputedStyle(b); bg = bs.backgroundColor; col = bs.color; fw = bs.fontWeight; }
       else { const t = el.querySelector('b,span'); if (t && t.textContent.trim() === el.textContent.trim()) { const ts = getComputedStyle(t); col = ts.color; if (Number(ts.fontWeight) > Number(fw)) fw = ts.fontWeight; } }
-      return 'border:1px solid #9ca3af;vertical-align:middle;mso-number-format:"\\@";' + (clear(bg) ? '' : 'background:' + bg + ';') + 'color:' + col + ';font-weight:' + (Number(fw) >= 600 ? 'bold' : 'normal') + ';text-align:' + cs.textAlign + ';width:' + Math.round(el.offsetWidth) + 'px;white-space:normal';
+       return 'border:1px solid #9ca3af;vertical-align:middle;' + (clear(bg) ? '' : 'background:' + bg + ';') + 'color:' + col + ';font-weight:' + (Number(fw) >= 600 ? 'bold' : 'normal') + ';text-align:' + cs.textAlign + ';width:' + Math.round(el.offsetWidth) + 'px;white-space:normal';
     };
     const cl = tbl.cloneNode(true);
     const o = [...tbl.querySelectorAll('th,td')], c = [...cl.querySelectorAll('th,td')];
-    o.forEach((el, i) => { const d = c[i]; if (!d) return; d.setAttribute('style', styleOf(el)); d.querySelectorAll('button').forEach((x) => x.remove()); d.textContent = d.textContent.replace(/^[▸▾]\s*/, '').replace(/\s+/g, ' ').trim(); });
+    o.forEach((el, i) => { const d = c[i]; if (!d) return; d.setAttribute('style', styleOf(el)); d.querySelectorAll('button').forEach((x) => x.remove()); const tx = d.textContent.replace(/^[▸▾]\s*/, '').replace(/\s+/g, ' ').trim(); d.textContent = tx;
+      const m = !el.hasAttribute('data-cu') && tx.match(/^(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:,\d+)?)(%?)$/);
+      if (m) { let v = parseFloat(m[1].replace(/\./g, '').replace(',', '.')); const dec = m[1].includes(','); if (m[2]) v = v / 100; d.setAttribute('x:num', String(v)); d.setAttribute('style', d.getAttribute('style') + ';mso-number-format:"' + (m[2] ? (dec ? '0.0%' : '0%') : dec ? '#,##0.0' : '#,##0') + '"'); }
+      else d.setAttribute('style', d.getAttribute('style') + ';mso-number-format:"\\@"'); });
     cl.querySelectorAll('tr.det').forEach((x) => x.remove());
     cl.querySelectorAll('colgroup').forEach((x) => x.remove());
     cl.removeAttribute('style'); cl.setAttribute('border', '1'); cl.setAttribute('style', 'border-collapse:collapse;font-family:Arial;font-size:11pt');
