@@ -106,7 +106,6 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const range = (a, b) => { const r = []; for (let d = a; d <= b; d = shift(d, 1)) r.push(d); return r; };
   const dayCache = new Map();
-  window.__tkdbg = { callApi: (b) => callApi(b), tplFor: (d) => tplFor(d), ensure: () => ensureApiReq(), post: async (path, body) => { await ensureApiReq(); const base = apiReq.url.replace(/ShipmentOrder\/SearchShipmentOrder/i, ''); const r = await _fetch.call(window, base + path, Object.assign({}, apiReq.init, { body: JSON.stringify(body) })); return r.json(); } };
   function tplFor(day) {
     const tpl = (searchTemplate || []).map((x) => ({ ...x }));
     const set = (k, v) => { const e = tpl.find((x) => x.SearchKey.toLowerCase() === k.toLowerCase()); if (e) e.SearchValue = v; else tpl.push({ SearchKey: k, SearchValue: v }); };
@@ -128,7 +127,7 @@
   const slim = (o) => ({
     id: o.ShipmentOrderID, so: norm(o.PartnerSaleOrderID) || String(o.ShipmentOrderID), exp: o.ExpectedDeliveryDate || '',
     den: o.EarliesDeliveryTime || '', arr: isArrived(o), st: o.ShipmentOrderStatusName || '', done: !!isDone(o), cancel: isCancelled(o), ret: o.IsInputReturn === true, km: hasKM(o), ml: isML(o),
-    xt: Number(o.CarrierTypeID) === 2, rt: Number(o.CarrierTypeID) === 2 ? String(o.ShipmentRouteID || '') : '', no: (o.IsOutputGoods || o.OutputGoodsDate) && !isCancelled(o) ? Number(o.TotalUnPaidInMoney) || 0 : 0, xg: String(o.OutputGoodsDate || ''), dd: String(o.EarliesDeliveryTime || o.CompletedDoServiceTime || '').slice(0, 10),
+    xt: Number(o.CarrierTypeID) === 2, rt: Number(o.CarrierTypeID) === 2 ? String(o.ShipmentRouteID || '') : '', no: (o.IsOutputGoods || o.OutputGoodsDate) && !isCancelled(o) ? Number(o.TotalUnPaidInMoney) || 0 : 0, xg: String(o.OutputGoodsDate || ''), dd: (isArrived(o) || isDone(o)) ? String(o.EarliesDeliveryTime || o.CompletedDoServiceTime || '').slice(0, 10) : '',
     tho: norm(String(o.DeliverUserFullNameList || '').split(/[,;]/)[0]), thoL: String(o.DeliverUserFullNameList || '').split(/[,;]/).map((x) => norm(x)).filter(Boolean), kho: KHO[Number(o.CoordinatorStoreID)] || '', stid: stOf(o), stn: norm(String(o.RequestStoreName || '')), spn: norm(String(o.ShipItemNameList || o.PrimaryShipItemName || '')), ntd: String(o.CompletedDoServiceTime || o.DeliveryCompletionTime || ''), huy: isCancelled(o) || /hủy|huỷ/i.test(norm(o.ShipmentOrderStatusName)), gx: !isCancelled(o) && /giao hàng thành công|đã giao|lắp đặt thành công|hoàn tất|kết thúc vận đơn/i.test(norm(o.ShipmentOrderStatusName)), tf: /chuyển kho/i.test(norm(o.ShipmentOrderTypeName)) || /^TFR/i.test(String(o.PartnerSaleOrderID || '')),
   });
   async function fetchDay(day) {
