@@ -89,7 +89,8 @@
   const NOT_ARRIVED_RE = /đang tới nhà khách|đang đến nhà khách|đã lấy hàng/i;
   const isArrived = (o) => !NOT_ARRIVED_RE.test(norm(o.ShipmentOrderStatusName)) && (!!o.EarliesDeliveryTime || Number(o.CurrentShipmentOrderStepID) >= ARRIVED_STEP);
   const KM_RE = /(^|[^A-Za-z0-9])KM([^A-Za-z0-9]|$)|khuy[eế]n\s*m[aã]i/i;
-  const hasKM = (o) => KM_RE.test([o.ShipItemNameList, o.PrimaryShipItemName, o.ShipmentOrderTypeName].join(';'));
+  // Đơn khuyến mãi = loại yêu cầu là KM, hoặc TẤT CẢ hàng trong đơn đều là hàng KM (đơn có hàng chính + quà KM vẫn tính)
+  const hasKM = (o) => { if (KM_RE.test(o.ShipmentOrderTypeName || '')) return true; const it = String(o.ShipItemNameList || '').split(';').map((x) => x.trim()).filter(Boolean); return it.length ? it.every((x) => KM_RE.test(x)) : KM_RE.test(o.PrimaryShipItemName || ''); };
   const ML_RE = /máy lạnh|điều hòa|điều hoà/i;
   const isML = (o) => ML_RE.test([o.ShipItemNameList, o.PrimaryShipItemName, o.ShipmentOrderTypeName].join(';'));
   const pad = (n) => String(n).padStart(2, '0');
@@ -105,7 +106,6 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const range = (a, b) => { const r = []; for (let d = a; d <= b; d = shift(d, 1)) r.push(d); return r; };
   const dayCache = new Map();
-  window.__tkdbg = { callApi: (b) => callApi(b), tplFor: (d) => tplFor(d), ensure: () => ensureApiReq() };
   function tplFor(day) {
     const tpl = (searchTemplate || []).map((x) => ({ ...x }));
     const set = (k, v) => { const e = tpl.find((x) => x.SearchKey.toLowerCase() === k.toLowerCase()); if (e) e.SearchValue = v; else tpl.push({ SearchKey: k, SearchValue: v }); };
