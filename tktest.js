@@ -464,7 +464,9 @@
         const NL = { 'Thanh Hóa': 330 }; // năng lực kho (đơn/ngày)
         const ks = state.cn ? [state.cn] : ['Thanh Hóa', 'Thọ Xuân'], cap = ks.every((k) => NL[k]) ? ks.reduce((a, k) => a + NL[k], 0) * nD : 0;
         const pct = cap ? S.m.tong / cap * 100 : 0;
-        return '<div class="card c3"><div>Năng lực kho' + (state.cn ? ' ' + esc(state.cn) : '') + '</div><div class="n">' + (cap ? fmt(cap) + ' <span style="font-size:14px">đơn</span>' : '—') + '</div><div style="font-size:11px;color:#6b7280">' + (cap ? fmt(S.m.tong) + '/' + fmt(cap) + ' ĐH · <b style="color:' + (pct > 100 ? '#dc2626' : pct >= 90 ? '#b45309' : '#15803d') + '">' + (Math.round(pct * 10) / 10).toLocaleString('vi-VN') + '%</b> · ' + (cap >= S.m.tong ? 'còn ' + fmt(cap - S.m.tong) : 'vượt ' + fmt(S.m.tong - cap)) : 'Chưa có năng lực kho Thọ Xuân') + '</div></div>' +
+        const rem = cap - S.m.tong, pc = pct > 100 ? '#dc2626' : pct >= 90 ? '#b45309' : '#15803d';
+        return '<div class="card c3"><div>Năng lực kho' + (state.cn ? ' ' + esc(state.cn) : '') + (cap ? ': <b>' + fmt(cap) + '</b> đơn' : '') + '</div>' +
+          (cap ? '<div class="n" style="color:' + (rem < 0 ? '#dc2626' : '#15803d') + '">' + (rem < 0 ? 'Vượt ' + fmt(-rem) : 'Còn ' + fmt(rem)) + '</div><div style="font-size:11px;color:#6b7280">Đã nhận ' + fmt(S.m.tong) + ' ĐH · <b style="color:' + pc + '">' + (Math.round(pct * 10) / 10).toLocaleString('vi-VN') + '%</b> năng lực</div>' : '<div class="n">—</div><div style="font-size:11px;color:#6b7280">Chưa có năng lực kho Thọ Xuân</div>') + '</div>' +
           '<div class="card c4"><div>TB ĐH / thợ' + (nD > 1 ? ' / ngày' : '') + '</div><div class="n">' + (Math.round(tb * 10) / 10).toLocaleString('vi-VN') + '</div><div style="font-size:11px;color:#6b7280">' + fmt(S.m.tong) + ' ĐH ÷ ' + nT + ' thợ' + (nD > 1 ? ' ÷ ' + nD + ' ngày' : '') + '</div></div></div>'; })()
       : '<div class="card c3"><div>Có ĐH sắp trễ</div><div class="n">' + fmt(S.c.o) + '</div></div>' +
       '<div class="card c4"><div>Có ĐH trễ hẹn</div><div class="n">' + fmt(S.c.r) + '</div></div></div>');
