@@ -105,7 +105,6 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const range = (a, b) => { const r = []; for (let d = a; d <= b; d = shift(d, 1)) r.push(d); return r; };
   const dayCache = new Map();
-  window.__tkdbg = { post: async (path, body) => { await ensureApiReq(); const base = apiReq.url.replace(/ShipmentOrder\/SearchShipmentOrder/i, ''); const r = await _fetch.call(window, base + path, Object.assign({}, apiReq.init, { body: JSON.stringify(body) })); return r.json(); } };
   function tplFor(day) {
     const tpl = (searchTemplate || []).map((x) => ({ ...x }));
     const set = (k, v) => { const e = tpl.find((x) => x.SearchKey.toLowerCase() === k.toLowerCase()); if (e) e.SearchValue = v; else tpl.push({ SearchKey: k, SearchValue: v }); };
@@ -1429,6 +1428,14 @@
       if (bsx) {
         // Xe tải: chọn đúng Bảng Số Xe Logistic anh chọn (TMS tự điền tài xế + tổ thợ theo xe)
         const findSel = (txt) => { const el = [...dr.querySelectorAll('*')].find((e) => e.children.length === 0 && e.textContent.trim().replace(/:$/, '') === txt); let n = el; for (let i = 0; i < 6 && n; i++) { n = n.parentElement; const sl = n && n.querySelector('.ant-select'); if (sl) return sl; } return null; };
+        if ((gt.rent || []).some((x) => x.bs === bsx)) { // xe thuê: chọn Hình thức thuê = Thuê xe ngoài trước
+          const ht = await ckWait(() => findSel('Hình thức thuê'), 6000);
+          if (!ht) { closeDr(); throw new Error('Không thấy ô Hình thức thuê — đã đóng'); }
+          const hi = ht.querySelector('input'); ht.querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); await gtSleep(700);
+          const ho = await ckWait(() => { const l = document.getElementById(hi.id + '_list'), d = l && l.closest('.ant-select-dropdown'); return d && [...d.querySelectorAll('.ant-select-item-option')].find((o) => /ngoài/i.test(o.textContent)); }, 5000);
+          if (!ho) { closeDr(); throw new Error('Không chọn được Thuê xe ngoài — đã đóng'); }
+          ho.click(); await gtSleep(1500);
+        }
         const bs = await ckWait(() => findSel('Bảng Số Xe Logistic'), 6000);
         if (!bs) { closeDr(); throw new Error('Không thấy ô Bảng Số Xe Logistic — đã đóng'); }
         const bi = bs.querySelector('input');
@@ -1500,6 +1507,25 @@
   // Bỏ chọn user/xe khi anh đóng ô chọn rồi không bấm Gắn (sau 5 giây không thao tác)
   gt.clearSel = () => { clearTimeout(gt.selT); gt.selT = null; if (gt.running || gt.barPop) return; if (!(gt.ptUsers || []).length && !gt.ptBsx && !gt.barQ) return; gt.ptUsers = []; gt.ptBsx = ''; gt.barQ = ''; try { localStorage.removeItem('tk_pt_users'); localStorage.removeItem('tk_pt_user'); } catch (er) {} gtBar(); renderGT(); };
   document.addEventListener('mousedown', (e) => { if (!gt.barPop) return; const pop = document.getElementById('tkgt-upop'), ub = document.getElementById('tkgt-ubtn'); if ((pop && pop.contains(e.target)) || (ub && ub.contains(e.target))) return; gt.barPop = false; gt.barQ = ''; if (pop) pop.style.display = 'none'; const q = document.getElementById('tkgt-uq'); if (q) q.value = ''; clearTimeout(gt.selT); const go = document.getElementById('tkgt-go'); if (!(go && go.contains(e.target))) gt.selT = setTimeout(gt.clearSel, 5000); }, true);
+  // Xe thuê: tải danh sách biển số xe thuê (renttype ≠ 0) từ Logistic theo kho + ngày giao, cập nhật liên tục
+  async function gtLoadRent(force) {
+    if (gt.rentLoading || (!force && gt.rentT && Date.now() - gt.rentT < 60000)) return;
+    gt.rentLoading = true;
+    try {
+      await ensureApiReq();
+      const base = apiReq.url.replace(/ShipmentOrder\/SearchShipmentOrder/i, '');
+      const t0 = ymd(today()); let f = gt.from || t0, e = gt.to || f; if (e < f) e = f;
+      let days = range(f, e); if (days.length > 7) days = days.slice(-7);
+      [t0, ymd(addDays(today(), 1))].forEach((d) => { if (!days.includes(d)) days.push(d); });
+      const m = new Map();
+      for (const [sid, kho] of [[33386, 'Thanh Hóa'], [33139, 'Thọ Xuân']]) for (const d of days) {
+        try { const r = await _fetch.call(window, base + 'ShipmentRoute/GetVehicleLogistic', Object.assign({}, apiReq.init, { body: JSON.stringify({ CoordinatorStoreID: sid, ExpectedDeliveryDate: d + 'T12:00:00' }) })); const j = await r.json();
+          (j && !j.IsError && j.ResultObject || []).forEach((v) => { const bs = String(v.licenseplateid || '').trim().toUpperCase(); if (!bs || Number(v.renttype) === 0) return; const k = kho + '|' + bs; const x = m.get(k) || { kho, bs, days: [] }; if (!x.days.includes(d)) x.days.push(d); m.set(k, x); }); } catch (er) {}
+      }
+      gt.rent = [...m.values()].sort((a, b) => a.kho.localeCompare(b.kho) || a.bs.localeCompare(b.bs));
+      gt.rentT = Date.now(); gt.rentAt = 'cập nhật ' + new Date().toLocaleTimeString('vi-VN').slice(0, 5);
+    } catch (e) {} finally { gt.rentLoading = false; if (gt.barPop) gtBar(); }
+  }
   function gtBar() {
     let bar = document.getElementById('tkgt-bar'); const S = gt.scan;
     if (!S) { if (bar) bar.remove(); return; }
@@ -1514,9 +1540,10 @@
     const ready = (nu || gt.ptBsx) && !gt.running; // có user là bấm Gắn được (tuyến đã tick hoặc đơn anh tự tick)
     bar.innerHTML = GT_ROUTES.map(([r]) => b(r, ab(r), S.by[r].length, 1)).join('') + GT_COMBOS.map(([c]) => b(c, c, gtCnt(S, c), 1)).join('') + b(GT_KHAC, 'Khác', gtCnt(S, GT_KHAC), 1) + Object.keys(GT_KHO).map((k) => b(k, GT_KHO[k], gtCnt(S, k), 1)).join('') + b('*', 'Hiện toàn bộ', S.rows.length, 0) +
       '<span style="position:relative;display:inline-flex"><span id="tkgt-ubtn" title="Chọn user (Nhân viên thực hiện), chọn được nhiều" style="display:inline-flex;align-items:center;gap:4px;border:1px solid #fdba74;border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap;background:#fff7ed;color:#9a3412;max-width:240px;line-height:16px;overflow:hidden;text-overflow:ellipsis">👤 ' + (nu ? esc(gt.ptUsers.map((u) => u.split(' - ')[1] || u).join(', ')) : 'User') + (gt.ptBsx ? ' · 🚚 ' + esc(gt.ptBsx) : '') + ' ▾</span>' +
-      '<div id="tkgt-upop" style="display:' + (gt.barPop ? 'block' : 'none') + ';position:absolute;bottom:100%;left:0;margin-bottom:6px;width:450px;background:#fff;border:1px solid #cfd5dd;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;color:#111827;font-weight:400"><div style="display:flex;gap:8px"><div style="flex:1;min-width:0"><input id="tkgt-uq" placeholder="Gõ mã hoặc tên user…" value="' + esc(gt.barQ || '') + '" style="width:100%;box-sizing:border-box;height:30px;border:1px solid #cfd5dd;border-radius:5px;padding:0 8px;font-size:13px;margin-bottom:4px"><div id="tkgt-ulist" style="max-height:260px;overflow:auto">' +
+      '<div id="tkgt-upop" style="display:' + (gt.barPop ? 'block' : 'none') + ';position:absolute;bottom:100%;left:0;margin-bottom:6px;width:480px;background:#fff;border:1px solid #cfd5dd;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;color:#111827;font-weight:400"><div style="display:flex;gap:8px"><div style="flex:1;min-width:0"><input id="tkgt-uq" placeholder="Gõ mã hoặc tên user…" value="' + esc(gt.barQ || '') + '" style="width:100%;box-sizing:border-box;height:30px;border:1px solid #cfd5dd;border-radius:5px;padding:0 8px;font-size:13px;margin-bottom:4px"><div id="tkgt-ulist" style="max-height:260px;overflow:auto">' +
       GT_USERS.map((u) => '<label class="tkgt-u" style="display:' + (!gt.barQ || u.toLowerCase().includes(gt.barQ.toLowerCase()) ? 'flex' : 'none') + ';gap:6px;align-items:center;padding:3px 4px;font-size:13px;cursor:pointer;margin:0"><input type="checkbox" value="' + esc(u) + '"' + ((gt.ptUsers || []).includes(u) ? ' checked' : '') + '>' + esc(u) + '</label>').join('') + '</div></div>' +
-      '<div style="width:140px;border-left:1px solid #e5e7eb;padding-left:8px"><div style="font-weight:700;color:#9a3412;font-size:12.5px;margin:4px 0 4px">🚚 Xe tải (BSX)</div><div style="font-size:11px;color:#6b7280;margin-bottom:4px;line-height:1.3">Tick xe = gắn Xe tải. Không tick = Xe máy.</div>' +
+      '<div style="width:170px;border-left:1px solid #e5e7eb;padding-left:8px;max-height:300px;overflow:auto"><div style="font-weight:700;color:#9a3412;font-size:12.5px;margin:4px 0 4px">🚚 Xe tải (BSX)</div><div style="font-size:11px;color:#6b7280;margin-bottom:4px;line-height:1.3">Tick xe = gắn Xe tải. Không tick = Xe máy.</div>' +
+      (() => { const R = gt.rent || []; const kk = [...new Set(R.map((x) => x.kho))]; return '<div style="font-size:12px;font-weight:700;color:#0f766e;margin-top:6px">Xe thuê ' + (gt.rentAt ? '<span style="font-weight:400;color:#6b7280;font-size:10.5px">(' + esc(gt.rentAt) + ')</span>' : '') + '</div>' + (R.length ? kk.map((k) => '<div style="font-size:11.5px;color:#6b7280;margin-top:2px">' + esc(k) + '</div>' + R.filter((x) => x.kho === k).map((x) => '<label class="tkgt-b" title="Xe thuê ngày ' + esc(x.days.join(', ')) + '" style="display:flex;gap:6px;align-items:center;padding:3px 2px;font-size:13px;cursor:pointer;margin:0"><input type="checkbox" value="' + esc(x.bs) + '"' + (gt.ptBsx === x.bs ? ' checked' : '') + '>' + esc(x.bs) + ' <span style="font-size:10.5px;color:#0f766e">' + esc(x.days.map((d) => d.slice(8, 10) + '/' + d.slice(5, 7)).join(',')) + '</span></label>').join('')).join('') : '<div style="font-size:11px;color:#9ca3af;margin:2px 0 6px">' + (gt.rentLoading ? 'Đang tải…' : 'Chưa có xe thuê – tạo thuê xe trên TMS là tự hiện') + '</div>') + '<div style="font-size:12px;font-weight:700;color:#9a3412;margin-top:6px">Xe nhà</div>'; })() +
       Object.entries(XE_NB).map(([k, v]) => '<div style="font-size:11.5px;color:#6b7280;margin-top:4px">' + esc(k) + '</div>' + v.split(',').map((x) => '<label class="tkgt-b" style="display:flex;gap:6px;align-items:center;padding:3px 2px;font-size:13px;cursor:pointer;margin:0"><input type="checkbox" value="' + esc(x) + '"' + (gt.ptBsx === x ? ' checked' : '') + '>' + esc(x) + '</label>').join('')).join('') + '</div></div></div></span>' +
       '<button id="tkgt-go" title="Gắn: tuyến đã tick (hoặc các đơn anh tự tick trên trang) → Phân tuyến giao hàng → Xe máy → user → Cập nhật"' + (ready ? '' : ' disabled') + ' style="border:0;border-radius:6px;padding:3px 10px;cursor:' + (ready ? 'pointer' : 'default') + ';font:700 11.5px Roboto,system-ui,sans-serif;white-space:nowrap;background:' + (ready ? '#ea580c' : '#fed7aa') + ';color:#fff">🚀 Gắn</button>' +
       '<button data-x="1" title="Tắt lọc tuyến" style="border:0;background:none;color:#6b7280;font-size:15px;cursor:pointer;padding:0 4px">✕</button>';
@@ -1526,7 +1553,7 @@
     bar.style.zoom = ''; if (full > cap) bar.style.zoom = String(Math.max(0.6, cap / full)); // luôn 1 dòng: hẹp thì thu nhỏ cả thanh
     bar.querySelectorAll('[data-v]').forEach((x) => (x.onclick = (e) => { if (e.target.matches('input[data-ck]')) return; gt.route = x.dataset.v; if (gt.route === '*') gt.barSel.clear(); gtApplyView(); gtBar(); renderGT(); }));
     bar.querySelectorAll('input[data-ck]').forEach((c) => (c.onchange = () => { c.checked ? gt.barSel.add(c.dataset.ck) : gt.barSel.delete(c.dataset.ck); gt.route = gt.barSel.size ? '#sel' : '*'; gtApplyView(); gtBar(); }));
-    bar.querySelector('#tkgt-ubtn').onclick = () => { clearTimeout(gt.selT); gt.barPop = !gt.barPop; gtBar(); if (gt.barPop) { const q = document.getElementById('tkgt-uq'); q && q.focus(); } };
+    bar.querySelector('#tkgt-ubtn').onclick = () => { clearTimeout(gt.selT); gt.barPop = !gt.barPop; if (gt.barPop) gtLoadRent(); gtBar(); if (gt.barPop) { const q = document.getElementById('tkgt-uq'); q && q.focus(); } };
     const uq = bar.querySelector('#tkgt-uq');
     uq.oninput = () => { gt.barQ = uq.value; const q = uq.value.toLowerCase(); bar.querySelectorAll('.tkgt-u').forEach((l) => (l.style.display = l.textContent.toLowerCase().includes(q) ? 'flex' : 'none')); };
     uq.onkeydown = (e) => { if (e.key === 'Enter') { const vis = [...bar.querySelectorAll('.tkgt-u')].filter((l) => l.style.display !== 'none'); if (vis.length === 1) { const c = vis[0].querySelector('input'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); } } };
