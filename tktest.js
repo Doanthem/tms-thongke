@@ -49,6 +49,7 @@
   const XE_NB = { 'Thanh Hóa': '50H64749,29E91205,29E91343,29E89909', 'Thọ Xuân': '50H58779,50E96676,29C61094' };
   const NB_SET = new Set(Object.values(XE_NB).join(',').split(','));
   const bsNorm = (p) => String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const XT_THUE_HQ = 12; // xe thuê: tối thiểu 12 ĐH/ngày mới Hiệu Quả (xe nội bộ 10)
   const CN_GAN = 24, CN_GIO = 48, TB_HQ = 10, THUE_DU = 12, THUE_NGAY = 1550000, THUE_DON = 125000;
   const tienThue = (n) => (n >= THUE_DU ? THUE_NGAY : n * THUE_DON);
   const BS_KEY = 'tk_dh_bsx_cache';
@@ -106,7 +107,6 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const range = (a, b) => { const r = []; for (let d = a; d <= b; d = shift(d, 1)) r.push(d); return r; };
   const dayCache = new Map();
-  window.__tkdbg = { callApi: (b) => callApi(b), tplFor: (d) => tplFor(d), ensure: () => ensureApiReq(), post: async (path, body) => { await ensureApiReq(); const base = apiReq.url.replace(/ShipmentOrder\/SearchShipmentOrder/i, ''); const r = await _fetch.call(window, base + path, Object.assign({}, apiReq.init, { body: JSON.stringify(body) })); return r.json(); } };
   function tplFor(day) {
     const tpl = (searchTemplate || []).map((x) => ({ ...x }));
     const set = (k, v) => { const e = tpl.find((x) => x.SearchKey.toLowerCase() === k.toLowerCase()); if (e) e.SearchValue = v; else tpl.push({ SearchKey: k, SearchValue: v }); };
@@ -240,7 +240,6 @@
     '@media (max-width:820px){.cards{grid-template-columns:repeat(2,1fr)}}'].join('\n');
   let host, root;
   const state = { view: 'cn', from: '', to: '', preset: 'today', cn: '', warn: '', q: '', open: new Set(), open48: new Set(), open24: new Set(), openDay: new Set(), data: null };
-  window.__tkdhState = state;
   function topSlot() {
     const nav = document.querySelector('header.topnav > nav.topnav-menu');
     if (!nav) return null;
@@ -581,19 +580,19 @@
     list.forEach((r) => {
       finC(r); r.days.forEach(finC);
       r.kho = [...r.khos].filter(Boolean).sort((a, b) => ordOf(a) - ordOf(b)).join(', ');
-      r.ngay = r.bs ? r.days.size : 0; r.tb = r.ngay ? r.tong / r.ngay : null;
-      r.dg = r.tb == null ? '' : r.tb >= TB_HQ ? 'Hiệu Quả' : 'Chưa Hiệu Quả';
+      r.ngay = r.bs ? r.days.size : 0; r.tb = r.ngay ? r.tong / r.ngay : null; r.hq = r.bs && !r.nb ? XT_THUE_HQ : TB_HQ;
+      r.dg = r.tb == null ? '' : r.tb >= r.hq ? 'Hiệu Quả' : 'Chưa Hiệu Quả';
     });
     if (state.warn) list = list.filter((x) => x.warn === state.warn);
     const q = bsNorm(state.q); if (q) list = list.filter((x) => x.bs.includes(q));
     const grp = (x) => (!x.bs ? 2 : x.nb ? 0 : 1);
     list.sort((a, b) => (a.bs ? 0 : 1) - (b.bs ? 0 : 1) || ordOf(a.kho.split(', ')[0]) - ordOf(b.kho.split(', ')[0]) || grp(a) - grp(b) || b.tong - a.tong);
-    const S = blankC(); S.ngay = 0; S.nbX = 0; S.thX = 0; S.dhBs = 0;
+    const S = blankC(); S.ngay = 0; S.nbX = 0; S.thX = 0; S.dhBs = 0; S.min = 0;
     list.forEach((x) => {
       ['tong', 'ml', 'dhk', 'ngay'].forEach((k) => (S[k] += x[k])); Object.keys(S.c).forEach((k) => (S.c[k] += x.c[k]));
-      if (x.bs) { S.dhBs += x.tong; x.nb ? (S.nbX += x.ngay) : (S.thX += x.ngay); }
+      if (x.bs) { S.dhBs += x.tong; S.min += x.hq * x.ngay; x.nb ? (S.nbX += x.ngay) : (S.thX += x.ngay); }
     });
-    finC(S); S.tb = S.ngay ? S.dhBs / S.ngay : null; S.dg = S.tb == null ? '' : S.tb >= TB_HQ ? 'Hiệu Quả' : 'Chưa Hiệu Quả';
+    finC(S); S.tb = S.ngay ? S.dhBs / S.ngay : null; S.hq = S.ngay ? S.min / S.ngay : TB_HQ; S.dg = S.tb == null ? '' : S.dhBs >= S.min ? 'Hiệu Quả' : 'Chưa Hiệu Quả';
     return { D, list, S };
   }
   function renderXT(out) {
@@ -602,7 +601,7 @@
     const Z = (v) => (v ? fmt(v) : '<span class="zz">-</span>');
     const TB = (o) => (o.tb == null ? '<span class="zz">-</span>' : o.tb.toLocaleString('vi-VN', { maximumFractionDigits: 1 }));
     // Đánh giá: đạt thì chỉ ghi Hiệu Quả; chưa đạt thì ghi thêm số ĐH còn thiếu
-    const DG = (o, thieu) => (o.dg ? '<span class="w ' + (o.tb >= TB_HQ ? 'dg-ok' : 'dg-no') + '" style="white-space:nowrap">' + o.dg + (o.tb < TB_HQ && thieu > 0 ? ' (+' + fmt(Math.ceil(thieu)) + ' ĐH)' : '') + '</span>' : '<span class="zz">-</span>');
+    const DG = (o, thieu) => (o.dg ? '<span class="w ' + (o.dg === 'Hiệu Quả' ? 'dg-ok' : 'dg-no') + '" style="white-space:nowrap">' + o.dg + (o.dg !== 'Hiệu Quả' && thieu > 0 ? ' (+' + fmt(Math.ceil(thieu)) + ' ĐH)' : '') + '</span>' : '<span class="zz">-</span>');
     const WC = (x) => {
       if (!(x.c.r || x.c.o)) return '<span class="w w-' + x.warn + '">' + WL[x.warn] + '</span>';
       return (x.c.r ? '<span class="w w-r"' + (x.c.o ? ' style="margin-bottom:0"' : '') + '>' + x.c.r + ' ĐH Trễ Hẹn</span>' : '') +
@@ -615,20 +614,20 @@
       '<div class="card c5"><div>ĐH Chưa hoàn tất</div><div class="n">' + fmt(S.chua) + '</div></div>' +
       '<div class="card c3"><div>ĐH sắp trễ</div><div class="n">' + fmt(S.c.o) + '</div></div>' +
       '<div class="card c4"><div>ĐH trễ hẹn</div><div class="n">' + fmt(S.c.r) + '</div></div></div>';
-    root.querySelector('#note').textContent = mainLabel + ': mỗi dòng là 1 biển số xe (lấy từ ô Biển Số Xe Logistic), tính theo ngày xe chạy thật (ngày đến nhà khách); đơn chưa chạy tính theo ngày hẹn. Bấm vào biển số để xem từng ngày, bấm vào ngày để xem danh sách SO. Đánh giá: TB ĐH / ngày từ ' + TB_HQ + ' đơn trở lên = Hiệu Quả, dưới ' + TB_HQ + ' = Chưa Hiệu Quả (kèm số ĐH còn thiếu để đạt ' + TB_HQ + ' ĐH/ngày). Xe chưa có biển số xếp cuối bảng.';
+    root.querySelector('#note').textContent = mainLabel + ': mỗi dòng là 1 biển số xe (lấy từ ô Biển Số Xe Logistic), tính theo ngày xe chạy thật (ngày đến nhà khách); đơn chưa chạy tính theo ngày hẹn. Bấm vào biển số để xem từng ngày, bấm vào ngày để xem danh sách SO. Đánh giá: TB ĐH / ngày đạt tối thiểu ' + TB_HQ + ' đơn (xe nội bộ) hoặc ' + XT_THUE_HQ + ' đơn (xe thuê) = Hiệu Quả; chưa đạt = Chưa Hiệu Quả (kèm số ĐH còn thiếu). Xe chưa có biển số xếp cuối bảng.';
     const cols = 10;
     let h = '<table style="table-layout:fixed;width:100%"><colgroup><col style="width:13%"><col style="width:9%"><col style="width:10%"><col style="width:10%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:17%"><col style="width:9%"><col style="width:9%"></colgroup><th style="white-space:normal;line-height:1.25"ead><tr><th style="white-space:normal;line-height:1.25">Biển Số</th><th style="white-space:normal;line-height:1.25">Kho</th><th style="white-space:normal;line-height:1.25" class="wm">Loại Xe</th><th style="white-space:normal;line-height:1.25" class="main sep">Tổng ĐH Xe Tải</th><th style="white-space:normal;line-height:1.25" class="main">ĐHK</th><th style="white-space:normal;line-height:1.25" class="main">Hoàn Tất</th><th style="white-space:normal;line-height:1.25" class="main">Chưa HT</th><th style="white-space:normal;line-height:1.25" class="main wm" title="TB ĐH / ngày từ ' + TB_HQ + ' trở lên = Hiệu Quả">Đánh Giá</th><th style="white-space:normal;line-height:1.25" class="xt sep">Số Ngày Chạy</th><th style="white-space:normal;line-height:1.25" class="xt">TB ĐH / Ngày</th></tr></thead><tbody>';
     if (!list.length) h += '<tr><td colspan="' + cols + '" class="empty">Không có đơn xe tải trong khoảng này.</td></tr>';
     list.forEach((x) => {
       const op = state.open.has(x.key);
       h += '<tr class="click" data-k="' + esc(x.key) + '"><td class="l kho">' + (op ? '▾ ' : '▸ ') + (x.bs ? esc(x.bs) : '<i>(chưa có BS)</i>') + '</td><td class="l">' + esc(x.kho) + '</td><td>' + LX(x) + '</td>' +
-        '<td class="sep"><b>' + Z(x.tong) + '</b></td><td>' + Z(x.dhk) + '</td><td>' + Z(x.c.h) + '</td><td>' + Z(x.chua) + '</td><td>' + DG(x, TB_HQ * x.ngay - x.tong) + '</td>' +
+        '<td class="sep"><b>' + Z(x.tong) + '</b></td><td>' + Z(x.dhk) + '</td><td>' + Z(x.c.h) + '</td><td>' + Z(x.chua) + '</td><td>' + DG(x, x.hq * x.ngay - x.tong) + '</td>' +
         '<td class="sep">' + Z(x.ngay) + '</td><td>' + TB(x) + '</td></tr>';
       if (!op) return;
       [...x.days.values()].sort((a, b) => a.day.localeCompare(b.day)).forEach((d) => {
         const kd = x.key + '|' + d.day, opd = state.openDay.has(kd);
         h += '<tr class="dayrow" data-kd="' + esc(kd) + '"><td class="l" style="padding-left:22px">' + (opd ? '▾ ' : '▸ ') + 'Ngày ' + vn(d.day) + '</td><td class="l">' + esc(x.kho) + '</td><td>' + LX(x) + '</td>' +
-          '<td class="sep"><b>' + Z(d.tong) + '</b></td><td>' + Z(d.dhk) + '</td><td>' + Z(d.c.h) + '</td><td>' + Z(d.chua) + '</td><td>' + (x.bs ? DG({ tb: d.tong, dg: d.tong >= TB_HQ ? 'Hiệu Quả' : 'Chưa Hiệu Quả' }, TB_HQ - d.tong) : '<span class="zz">-</span>') + '</td><td class="sep"></td><td></td></tr>';
+          '<td class="sep"><b>' + Z(d.tong) + '</b></td><td>' + Z(d.dhk) + '</td><td>' + Z(d.c.h) + '</td><td>' + Z(d.chua) + '</td><td>' + (x.bs ? DG({ tb: d.tong, dg: d.tong >= x.hq ? 'Hiệu Quả' : 'Chưa Hiệu Quả' }, x.hq - d.tong) : '<span class="zz">-</span>') + '</td><td class="sep"></td><td></td></tr>';
         if (!opd) return;
         const ls = d.list.slice().sort((a, b) => 'roagdh'.indexOf(a.ss) - 'roagdh'.indexOf(b.ss) || a.exp.localeCompare(b.exp));
         h += '<tr class="det"><td colspan="' + cols + '"><div class="stk"><b>Danh sách SO – ' + (x.bs ? esc(x.bs) : '(chưa có biển số)') + ' – ngày ' + vn(d.day) + '</b><table><thead><tr><th>Mã SO</th><th>Số VĐ</th><th>Loại</th><th>Thợ</th><th>Ngày hẹn</th><th>Giờ hẹn</th><th>Giờ đến nhà</th><th>Trạng thái TMS</th><th>Cảnh báo</th></tr></thead><tbody>' +
@@ -637,7 +636,7 @@
       });
     });
     h += '<tr class="tot"><td colspan="3">Tổng cộng (' + fmt(list.filter((x) => x.bs).length) + ' xe)</td><td class="sep">' + Z(S.tong) + '</td><td>' + Z(S.dhk) + '</td><td>' + Z(S.c.h) + '</td><td>' + Z(S.chua) + '</td>' +
-      '<td>' + DG(S, TB_HQ * S.ngay - S.dhBs) + '</td>' +
+      '<td>' + DG(S, S.min - S.dhBs) + '</td>' +
       '<td class="sep">' + Z(S.ngay) + '</td><td>' + TB(S) + '</td></tr>';
     out.innerHTML = h + '</tbody></table>';
   }
@@ -646,8 +645,8 @@
     const { D, list } = B;
     const r = [['Biển Số', 'Kho', 'Loại Xe', 'Ngày Chạy', 'Tổng ĐH Xe Tải', 'ĐHK', 'Hoàn Tất', 'Chưa HT', 'Đánh Giá']];
     list.forEach((x) => {
-      r.push([x.bs || '(chưa có)', x.kho, LX(x), 'Tổng ' + x.ngay + ' ngày', x.tong, x.dhk, x.c.h, x.chua, x.dg + (x.tb != null && x.tb < TB_HQ ? ' (+' + Math.ceil(TB_HQ * x.ngay - x.tong) + ' ĐH)' : '')]);
-      [...x.days.values()].sort((a, b) => a.day.localeCompare(b.day)).forEach((d) => r.push([x.bs || '(chưa có)', x.kho, LX(x), vn(d.day), d.tong, d.dhk, d.c.h, d.chua, x.bs ? (d.tong >= TB_HQ ? 'Hiệu Quả' : 'Chưa Hiệu Quả (+' + (TB_HQ - d.tong) + ' ĐH)') : '']));
+      r.push([x.bs || '(chưa có)', x.kho, LX(x), 'Tổng ' + x.ngay + ' ngày', x.tong, x.dhk, x.c.h, x.chua, x.dg + (x.tb != null && x.tb < x.hq ? ' (+' + Math.ceil(x.hq * x.ngay - x.tong) + ' ĐH)' : '')]);
+      [...x.days.values()].sort((a, b) => a.day.localeCompare(b.day)).forEach((d) => r.push([x.bs || '(chưa có)', x.kho, LX(x), vn(d.day), d.tong, d.dhk, d.c.h, d.chua, x.bs ? (d.tong >= x.hq ? 'Hiệu Quả' : 'Chưa Hiệu Quả (+' + (x.hq - d.tong) + ' ĐH)') : '']));
     });
     const text = '﻿' + r.map((a) => a.map((c) => { const s = String(c == null ? '' : c); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\r\n');
     const a = document.createElement('a');
